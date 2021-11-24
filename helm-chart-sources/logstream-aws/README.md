@@ -1,6 +1,6 @@
 ![Cribl Logo](../../images/Cribl_Logo_Color_TM.png)
 
-# logstream-workergroup Helm Chart
+# logstream-aws Helm Chart
 
 This Chart deploys a Cribl LogStream worker group.
 
@@ -66,15 +66,15 @@ We recommend that you use the same version of the Cribl LogStream code on leader
 
 * To  install the chart with the release name "logstream-wg":
 
- `helm install logstream-wg cribl/logstream-workergroup`
+ `helm install logstream-wg cribl/logstream-aws`
 
 * To install the chart using the logstream leader 'logstream.lab.cribl.io'
 
- `helm install logstream-wg cribl/logstream-workergroup --set config.host='logstream.lab.cribl.io`
+ `helm install logstream-wg cribl/logstream-aws --set config.host='logstream.lab.cribl.io`
 
 * To install the chart using the logstream leader 'logstream.lab.cribl.io' in the namespace "cribl-helm"
 
- `helm install logstream-wg cribl/logstream-workergroup --set config.host='logstream.lab.cribl.io' -n cribl-helm`
+ `helm install logstream-wg cribl/logstream-aws --set config.host='logstream.lab.cribl.io' -n cribl-helm`
  
 # Upgrading
 
@@ -84,10 +84,10 @@ This is done simply using the `helm upgrade` command. It's important to ensure t
 helm repo update
 ```
 
-After this step, invoke `helm upgrade <release> -n <namespace> cribl/logstream-workergroup`. For the example above, where the release is "logstream-wg" and is installed in the "cribl-helm" namespace, the command would be:
+After this step, invoke `helm upgrade <release> -n <namespace> cribl/logstream-aws`. For the example above, where the release is "logstream-wg" and is installed in the "cribl-helm" namespace, the command would be:
 
 ```
-helm upgrade logstream-wg -n cribl-helm cribl/logstream-workergroup
+helm upgrade logstream-wg -n cribl-helm cribl/logstream-aws
 ```
 
 This helm chart's upgrade is idempotent, so you can use the upgrade mechanism to upgrade, but can also use it as displayed [below](#changing) for changing its configuration. 
@@ -124,7 +124,7 @@ For example, if you want to add an additional TCP-based syslog port to the relea
 ...to the `values.yaml` file's `service` > `ports` subsection, and then run:
 
 ```
-helm upgrade logstream-wg cribl/logstream-workergroup -f values.yaml
+helm upgrade logstream-wg cribl/logstream-aws -f values.yaml
 ```
 
 Remember, if you installed in a namespace, you need to include the `-n <namespace>` option to any `helm` command. You'll still have to create the source in your LogStream leader, and commit and deploy it to your worker group.

@@ -1,6 +1,6 @@
 {{- define "workergroup.pod" -}}
 {{- if .Values.rbac.create }}
-serviceAccountName: {{ include "logstream-workergroup.fullname" . }}
+serviceAccountName: {{ include "logstream-aws.fullname" . }}
 {{- end }}
 
 {{- with .Values.imagePullSecrets }}
@@ -48,7 +48,7 @@ containers:
       - name: CRIBL_DIST_MASTER_URL
         valueFrom:
           secretKeyRef:
-            name: logstream-config-{{ include "logstream-workergroup.fullname" . }}
+            name: logstream-config-{{ include "logstream-aws.fullname" . }}
             key: url-master
       # Self-Signed Certs
       - name: NODE_TLS_REJECT_UNAUTHORIZED

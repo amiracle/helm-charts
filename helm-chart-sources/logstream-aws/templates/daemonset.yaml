@@ -2,13 +2,13 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "logstream-workergroup.fullname" . }}
+  name: {{ include "logstream-aws.fullname" . }}
   labels:
-    {{- include "logstream-workergroup.labels" . | nindent 4 }}
+    {{- include "logstream-aws.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "logstream-workergroup.selectorLabels" . | nindent 6 }}
+      {{- include "logstream-aws.selectorLabels" . | nindent 6 }}
   template:
     metadata:
     {{- with .Values.podAnnotations }}
@@ -16,8 +16,8 @@ spec:
         {{- toYaml . | nindent 8 }}
     {{- end }}
       labels:
-        {{- include "logstream-workergroup.selectorLabels" . | nindent 8 }}
+        {{- include "logstream-aws.selectorLabels" . | nindent 8 }}
 
     spec:
-      {{- include "workergroup.pod" . | nindent 8 }}
+      {{- include "aws.pod" . | nindent 8 }}
 {{- end }}
