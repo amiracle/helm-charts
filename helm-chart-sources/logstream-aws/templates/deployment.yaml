@@ -1,0 +1,24 @@
+{{- if (eq .Values.deployment "deployment") -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logstream-workergroup.fullname" . }}
+  labels:
+    {{- include "logstream-workergroup.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "logstream-workergroup.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "logstream-workergroup.selectorLabels" . | nindent 8 }}
+
+    spec:
+      {{- include "workergroup.pod" . | nindent 8 }}
+{{- end }}

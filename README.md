@@ -52,6 +52,12 @@ helm install ls-wg-system-metrics cribl/logstream-workergroup \
   --set config.tag="system-metrics" \
   --set config.token="ABCDEF01-1234-5678-ABCD-ABCDEF012345" \
   -n logstream
+
+helm install ls-wg-aws cribl/logstream-aws \
+  --set config.host="ls-leader-internal" \
+  --set config.tag="aws-workers" \
+  --set config.token="ABCDEF01-1234-5678-ABCD-ABCDEF012345" \
+  -n logstream  
 ```
 
 ## Running Distributed on a Free License
@@ -67,6 +73,7 @@ helm repo update
 helm upgrade ls-leader cribl/logstream-leader -n logstream
 helm upgrade ls-wg-pci cribl/logstream-workergroup -n logstream
 helm upgrade ls-wg-system-metrics cribl/logstream-workergroup -n logstream
+helm upgrade ls-wg-aws cribl/logstream-aws -n logstream
 ```
 
 # Support
