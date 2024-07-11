@@ -40,12 +40,6 @@ helm.sh/chart: {{ include "common.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-{{/* Removed to work with AWS EKS AddOn }
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- range $key, $val := .Values.extraLabels }}
-{{ $key }}: {{ $val | quote -}}
-{{- end }}
-*/}}
 {{- end }}
 
 {{/*
