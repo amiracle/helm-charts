@@ -1,0 +1,23 @@
+{{- if (eq .Values.deployment "daemonset") -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "logstream-aws.fullname" . }}
+  labels:
+    {{- include "logstream-aws.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "logstream-aws.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "logstream-aws.selectorLabels" . | nindent 8 }}
+
+    spec:
+      {{- include "aws.pod" . | nindent 8 }}
+{{- end }}

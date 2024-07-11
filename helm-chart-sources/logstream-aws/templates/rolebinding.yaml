@@ -1,0 +1,17 @@
+{{- if .Values.rbac.create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "logstream-aws.fullname" . }}:logstream-aws:{{ .Release.Namespace }}
+  labels:
+    {{- include "logstream-aws.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "logstream-aws.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "logstream-aws.fullname" . }}:logstream-aws:{{ .Release.Namespace }}
+{{- end }}
