@@ -45,7 +45,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- range $key, $val := .Values.extraLabels }}
 {{ $key }}: {{ $val | quote -}}
 {{- end }}
-*//}}
+*/}}
 {{- end }}
 
 {{/*
