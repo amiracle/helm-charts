@@ -7,9 +7,9 @@ replicaCount: 1
 
 criblImage:
   repository: cribl/cribl
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "3.1.2"
+  tag: 4.7.1
 
 imagePullSecrets: []
 nameOverride: "leader"
@@ -25,16 +25,57 @@ config:
   token:
   adminPassword:
   criblHome: /opt/cribl
+  bindHost: 0.0.0.0
   rejectSelfSignedCerts: 0
-  healthPort: 9000
+  # -- Perform health checks on the Leader pod.
+  # Recommended that this be enabled to automatically restart the Leader if the Pod is unhealthy
+  probes: true
+  livenessProbe:
+    httpGet:
+      path: /api/v1/health
+      port: 9000
+      scheme: HTTP
+    initialDelaySeconds: 60
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /api/v1/health
+      port: 9000
+      scheme: HTTP
+    initialDelaySeconds: 60
+    failureThreshold: 3
   groups: []
 
 env: {}
 
+persistence:
+  # -- Disable this to use an emptyDir for CRIBL_VOLUME_DIR config storage
+  enabled: true
+  # -- Unset claimName to use the Helm Release name as the PVC name
+  # This is set for backwards compatability purposes
+  claimName: leader-config-claim
+  # -- Set storageClassName to use a class other than the default
+  # Will prioritize this value above the value defined in config.scName
+  storageClassName:
+  # -- Access Modes for the Cribl Leader configs
+  accessModes:
+    - ReadWriteOnce
+  # -- The size of the requested persistent volume claim
+  size: 20Gi
+  # -- Define any annotation KVs to be set on the PVC
+  annotations: {}
+  # -- extraSpec permits any custom spec values to be added to the PVC config
+  extraSpec: {}
+
 service:
   internalType: ClusterIP
   externalType: LoadBalancer
+  # annotations are shared between both the internal and external Service
   annotations: {}
+  # internalAnnotations are only applied to the internal Service
+  internalAnnotations: {}
+  # externalAnnotations are only applied to the external Service
+  externalAnnotations: {}
   ports:
     - name: api
       port: 9000
@@ -45,6 +86,12 @@ service:
       protocol: TCP
       external: false
 
+strategy:
+  type: Recreate
+  rollingUpdate:
+    maxSurge:
+    maxUnavailable:
+
 podAnnotations: {}
 
 podSecurityContext: {}
@@ -54,6 +101,14 @@ securityContext: {}
 ingress:
   enable: false
   annotations: {}
+  tls: {}
+#    - hosts:
+#        - cribl.example.com
+#      secretName: cribl-example-com-tls
+  prefix: /*
+  pathType: Prefix
+  ingressClassName:
+  host:
 
 resources:
   limits:
@@ -69,3 +124,10 @@ tolerations: []
 
 affinity: {}
 
+# Extra manifests to be deployed
+extraObjects: {}
+
+# Applies extra labels to all resources deployed with this chart
+extraLabels: {}
+# key: value
+# key2: value2

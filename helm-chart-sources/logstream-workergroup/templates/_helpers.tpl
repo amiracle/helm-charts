@@ -41,6 +41,9 @@ helm.sh/chart: {{ include "logstream-workergroup.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- range $key, $val := .Values.extraLabels }}
+{{ $key }}: {{ $val | quote -}}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -59,5 +62,16 @@ Create the name of the service account to use
 {{- default (include "logstream-workergroup.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Allows for overriding the default RBAC naming scheme
+*/}}
+{{- define "logstream-workergroup.rbacName" }}
+{{- if .Values.rbac.name }}
+{{- .Values.rbac.name | quote }}
+{{- else }}
+{{- printf "%s:%s:%s" (include "logstream-workergroup.fullname" .) "logstream-workergroup" .Release.Namespace | quote }}
 {{- end }}
 {{- end }}

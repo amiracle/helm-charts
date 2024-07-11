@@ -1,0 +1,71 @@
+suite: Service
+templates:
+  - service.yaml
+tests:
+  - it: Should not configure the externalTrafficPolicy with default values
+    asserts:
+      - notExists:
+          path: spec.externalTrafficPolicy
+
+  - it: Should not configure the externalTrafficPolicy when type is Cluster IP
+    set:
+      service:
+        type: ClusterIP
+        externalTrafficPolicy: Local
+    asserts:
+      - notExists:
+          path: spec.externalTrafficPolicy
+
+  - it: Should configure the externalTrafficPolicy when type is LoadBalancer
+    set:
+      service:
+        type: LoadBalancer
+        externalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+
+  - it: Should configure the externalTrafficPolicy only when type is NodePort
+    set:
+      service:
+        type: NodePort
+        externalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+
+  - it: Should not configure the loadBalancerSourceRanges by default
+    asserts:
+      - notExists:
+          path: spec.loadBalancerSourceRanges
+
+  - it: Should configure the loadBalancerSourceRanges
+    set:
+      service.loadBalancerSourceRanges:
+        - "192.168.0.0/24"
+        - "192.168.1.0/24"
+        - "172.16.0.0/16"
+    asserts:
+      - exists:
+          path: spec.loadBalancerSourceRanges
+      - equal:
+          path: spec.loadBalancerSourceRanges
+          value:
+            - "192.168.0.0/24"
+            - "192.168.1.0/24"
+            - "172.16.0.0/16"
+
+  - it: No default set for nodePort
+    asserts:
+      - notExists:
+          path: spec.ports[0].nodePort
+
+  - it: Default values set for nodePort
+    set:
+      service.ports[0].nodePort: 30000
+    asserts:
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30000

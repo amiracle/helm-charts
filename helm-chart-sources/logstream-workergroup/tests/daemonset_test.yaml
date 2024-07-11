@@ -1,0 +1,42 @@
+suite: Deployment
+templates:
+  - daemonset.yaml
+tests:
+  - it: Should not have a strategy by default
+    set:
+      deployment: daemonset
+    asserts:
+      - notExists:
+          path: spec.strategy
+      - notExists:
+          path: spec.updateStrategy
+
+  - it: Should have a custom strategy
+    set:
+      deployment: daemonset
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1
+          maxSurge: 1
+    asserts:
+      - exists:
+          path: spec.updateStrategy
+      - notExists:
+          path: spec.strategy
+      - equal:
+          path: spec.updateStrategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxUnavailable: 1
+              maxSurge: 1
+
+  - it: Should fail on bad strategy
+    set:
+      deployment: daemonset
+      strategy:
+        type: GOAT
+    asserts:
+      - failedTemplate:
+          errorMessage: Not a valid strategy type for DaemonSet (GOAT)

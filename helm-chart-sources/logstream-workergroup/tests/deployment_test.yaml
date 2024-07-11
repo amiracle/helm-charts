@@ -1,0 +1,195 @@
+suite: Deployment
+templates:
+  - deployment.yaml
+tests:
+  - it: Should have health checks by default
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - exists:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  - it: Should disable health checks
+    set:
+      config.probes: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  - it: Should disable one health check
+    set:
+      config.readinessProbe: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - exists:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  - it: Should customize health checks
+    set:
+      config:
+        readinessProbe:
+          httpGet:
+            path: /isnt/a/real/endpoint
+            port: 420
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          failureThreshold: 1
+        livenessProbe:
+          httpGet: null
+          initialDelaySeconds: null
+          failureThreshold: null
+          foo: bar
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe
+          value:
+            httpGet:
+              path: /isnt/a/real/endpoint
+              port: 420
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            failureThreshold: 1
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe
+          value:
+            foo: bar
+
+  - it: Should not have a strategy by default
+    asserts:
+      - notExists:
+          path: spec.strategy
+      - notExists:
+          path: spec.updateStrategy
+
+  - it: Should have a custom strategy
+    set:
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1
+          maxSurge: 1
+    asserts:
+      - exists:
+          path: spec.strategy
+      - notExists:
+          path: spec.updateStrategy
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxUnavailable: 1
+              maxSurge: 1
+
+  - it: Should fail on bad strategy
+    set:
+      strategy:
+        type: GOAT
+    asserts:
+      - failedTemplate:
+          errorMessage: Not a valid strategy type for Deployment (GOAT)
+
+  - it: Should set extraPodConfigs
+    set:
+      extraPodConfigs:
+        foo:
+          - goat: true
+        topologySpreadConstraints:
+          - goat: true
+    asserts:
+      - exists:
+          path: spec.template.spec.foo
+      - exists:
+          path: spec.template.spec.topologySpreadConstraints
+      - equal:
+          path: spec.template.spec.foo
+          value:
+            - goat: true
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints
+          value:
+            - goat: true
+
+  - it: Should set tolerations
+    set:
+      tolerations:
+        - key: "key1"
+          operator: "Equal"
+          value: "value1"
+          effect: "NoSchedule"
+    asserts:
+      - exists:
+          path: spec.template.spec.tolerations
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: "key1"
+              operator: "Equal"
+              value: "value1"
+              effect: "NoSchedule"
+
+  - it: Should not define a CRIBL_DIST_MASTER_URL env
+    set:
+      config:
+        useExistingSecret: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CRIBL_DIST_MASTER_URL
+          any: true
+        not: true
+
+  - it: Should include the extraEnvFrom for CRIBL_DIST_MASTER_URL
+    set:
+      config:
+        useExistingSecret: true
+      envValueFrom:
+        - name: CRIBL_DIST_MASTER_URL
+          valueFrom:
+            secretKeyRef:
+              name: <secretName>
+              key: <secretKey>
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CRIBL_DIST_MASTER_URL
+            valueFrom:
+              secretKeyRef:
+                name: <secretName>
+                key: <secretKey>
+          any: true
+          count: 1
+
+  - it: Should define TCP as the default protocol for a port
+    set:
+      service:
+        ports:
+          - name: foo
+            port: 420
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: foo
+              containerPort: 420
+              protocol: TCP
+
+  - it: Should define UDP as the protocol for a port
+    set:
+      service:
+        ports:
+          - name: foo
+            port: 420
+            protocol: UDP
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: foo
+              containerPort: 420
+              protocol: UDP

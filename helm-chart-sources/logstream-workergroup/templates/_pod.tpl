@@ -1,6 +1,6 @@
 {{- define "workergroup.pod" -}}
-{{- if .Values.rbac.create }}
-serviceAccountName: {{ include "logstream-workergroup.fullname" . }}
+{{- if or .Values.serviceAccount.create (and (not .Values.serviceAccount.create) .Values.serviceAccount.name) }}
+serviceAccountName: {{ include "logstream-workergroup.serviceAccountName" . }}
 {{- end }}
 
 {{- with .Values.imagePullSecrets }}
@@ -11,45 +11,51 @@ imagePullSecrets:
 initContainers:
   {{- toYaml . | nindent 8 }}
 {{- end }}
+{{- if .Values.config.hostNetwork }}
+hostNetwork: true
+{{- end }}
+{{- if .Values.podSecurityContext }}
+securityContext:
+{{- range $key, $value := .Values.podSecurityContext }}
+{{- if or (eq $key "runAsUser") (eq $key "runAsGroup") (eq $key "fsGroup")}}
+  {{ $key }}: {{ $value | int }}
+{{- else }}
+  {{ $key }}: {{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}
 containers:
   - name: {{ .Chart.Name }}
     image: "{{ .Values.criblImage.repository }}:{{ .Values.criblImage.tag | default .Chart.AppVersion }}"
     imagePullPolicy: {{ .Values.criblImage.pullPolicy }}
     {{- if .Values.securityContext }}
-    command: 
-    - bash
-    - -c 
-    - |
-      set -x 
-      apt update; apt-get install -y gosu
-      useradd -d /opt/cribl -g "{{- .Values.securityContext.runAsGroup }}" -u "{{- .Values.securityContext.runAsUser }}" cribl
-      chown  -R   "{{- .Values.securityContext.runAsUser }}:{{- .Values.securityContext.runAsGroup }}" /opt/cribl
-      gosu "{{- .Values.securityContext.runAsUser }}:{{- .Values.securityContext.runAsGroup }}" /sbin/entrypoint.sh cribl
+    securityContext:
+    {{- range $key, $value := .Values.securityContext }}
+    {{- if or (eq $key "runAsUser") (eq $key "runAsGroup") (eq $key "fsGroup")}}
+      {{ $key }}: {{ $value | int }}
+    {{- else }}
+      {{ $key }}: {{ $value }}
     {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.config.probes }}
+    {{- with .Values.config.livenessProbe }}
     livenessProbe:
-      httpGet:
-        path: /api/v1/health
-        port: {{ .Values.config.healthPort }}
-        {{- if .Values.config.healthScheme }}
-        scheme: {{ .Values.config.healthScheme }}
-        {{- end }}
-      failureThreshold: 3
-      initialDelaySeconds: 20
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.config.readinessProbe }}
     readinessProbe:
-      httpGet:
-        path: /api/v1/health
-        port: {{ .Values.config.healthPort }}
-        {{- if .Values.config.healthScheme }}
-        scheme: {{ .Values.config.healthScheme }}
-        {{- end }}
-      failureThreshold: 3
-      initialDelaySeconds: 20
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
     env:
+      {{- if not .Values.config.useExistingSecret }}
       - name: CRIBL_DIST_MASTER_URL
         valueFrom:
           secretKeyRef:
             name: logstream-config-{{ include "logstream-workergroup.fullname" . }}
             key: url-master
+      {{- end }}
       # Self-Signed Certs
       - name: NODE_TLS_REJECT_UNAUTHORIZED
         value: "{{ .Values.config.rejectSelfSignedCerts }}"
@@ -86,16 +92,31 @@ containers:
       {{-  range .Values.service.ports }}
       - name: {{ .name }}
         containerPort: {{ .port }}
+        protocol: {{ .protocol | default "TCP" }}
       {{- end }}
     resources:
       {{- toYaml .Values.resources | nindent 12 }}
+
+{{- with .Values.extraContainers }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 
 {{- with .Values.nodeSelector }}
 nodeSelector:
   {{- toYaml .  | nindent 2 }}
 {{- end }}
 
-volumes:
+{{- with .Values.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+
+{{- with .Values.extraPodConfigs }}
+{{ toYaml . }}
+{{- end }}
+
+volumes: 
+  {{- if (ne .Values.deployment "statefulset") -}}
   {{- range .Values.extraVolumeMounts }}
   - name: {{ .name }}
     {{- if .existingClaim }}
@@ -107,6 +128,7 @@ volumes:
     {{- else }}
     emptyDir: {}
     {{- end }}
+  {{- end }}
   {{- end }}
   {{- range .Values.extraConfigmapMounts }}
   - name: {{ .name }}
@@ -129,6 +151,3 @@ volumes:
   {{- end }}
 
 {{- end }}
-
-
-

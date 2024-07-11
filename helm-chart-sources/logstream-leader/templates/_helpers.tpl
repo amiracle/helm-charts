@@ -41,6 +41,9 @@ helm.sh/chart: {{ include "logstream-leader.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- range $key, $val := .Values.extraLabels }}
+{{ $key }}: {{ $val | quote -}}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -59,5 +62,19 @@ Create the name of the service account to use
 {{- default (include "logstream-leader.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+  Join annotations passed in from values.yaml for Services
+*/}}
+{{- define "logstream-leader.service.annotations" -}}
+{{- if eq .templateType "internal" }}
+{{- $intAnnotations := (merge .Values.service.annotations .Values.service.internalAnnotations) -}}
+{{ toYaml $intAnnotations }}
+{{- end }}
+{{- if eq .templateType "external" }}
+{{- $extAnnotations := (merge .Values.service.annotations .Values.service.externalAnnotations) -}}
+{{ toYaml $extAnnotations }}
 {{- end }}
 {{- end }}

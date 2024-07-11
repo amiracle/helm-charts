@@ -1,23 +1,31 @@
 {{- define "leader.pod" -}}
-
 {{- with .Values.imagePullSecrets }}
 imagePullSecrets:
   {{- toYaml . | nindent 8 }}
+{{- end }}
+{{- if .Values.podSecurityContext }}
+securityContext:
+{{- range $key, $value := .Values.podSecurityContext }}
+{{- if or (eq $key "runAsUser") (eq $key "runAsGroup") (eq $key "fsGroup")}}
+  {{ $key }}: {{ $value | int }}
+{{- else }}
+  {{ $key }}: {{ $value }}
+{{- end }}
+{{- end }}
 {{- end }}
 containers:
   - name: {{ .Chart.Name }}
     image: "{{ .Values.criblImage.repository }}:{{ .Values.criblImage.tag | default .Chart.AppVersion }}"
     imagePullPolicy: {{ .Values.criblImage.pullPolicy }}
     {{- if .Values.securityContext }}
-    command: 
-    - bash
-    - -c 
-    - |
-      set -x 
-      apt update; apt-get install -y gosu
-      useradd -d /opt/cribl -g "{{- .Values.securityContext.runAsGroup }}" -u "{{- .Values.securityContext.runAsUser }}" cribl
-      chown  -R   "{{- .Values.securityContext.runAsUser }}:{{- .Values.securityContext.runAsGroup }}" /opt/cribl
-      gosu "{{- .Values.securityContext.runAsUser }}:{{- .Values.securityContext.runAsGroup }}" /sbin/entrypoint.sh cribl
+    securityContext:
+    {{- range $key, $value := .Values.securityContext }}
+    {{- if or (eq $key "runAsUser") (eq $key "runAsGroup") (eq $key "fsGroup")}}
+      {{ $key }}: {{ $value | int }}
+    {{- else }}
+      {{ $key }}: {{ $value }}
+    {{- end }}
+    {{- end }}
     {{- end }}
     volumeMounts:
     - name: config-storage
@@ -25,6 +33,11 @@ containers:
     {{- if  or .Values.config.license ( or .Values.config.adminPassword .Values.config.groups ) }}
     - name: initial-config
       mountPath: /var/tmp/config_bits
+    {{- end }}
+    {{- if or .Values.securityContext .Values.podSecurityContext }}
+    - name: gitconfig
+      mountPath: /.gitconfig
+      subPath: .gitconfig
     {{- end }}
     {{- range .Values.extraConfigmapMounts }}
     - name: {{ .name }}
@@ -44,32 +57,25 @@ containers:
       subPath: {{ .subPath | default "" }}
       readOnly: {{ .readOnly }}
     {{- end }}
-    
+
     ports:
       {{-  range .Values.service.ports }}
       - name: {{ .name }}
         containerPort: {{ .port }}
+        protocol: {{ .protocol | default "TCP" }}
       {{- end }}
+    {{- if .Values.config.probes }}
+    {{- with .Values.config.livenessProbe }}
     livenessProbe:
-      httpGet:
-        path: /api/v1/health
-        port: {{ .Values.config.healthPort }}
-        {{- if .Values.config.healthScheme }}
-        scheme: {{ .Values.config.healthScheme }}
-        {{- end }}
-      failureThreshold: 3
-      initialDelaySeconds: 60
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.config.readinessProbe }}
     readinessProbe:
-      httpGet:
-        path: /api/v1/health
-        port: {{ .Values.config.healthPort }}
-        {{- if .Values.config.healthScheme }}
-        scheme: {{ .Values.config.healthScheme }}
-        {{- end }}
-      failureThreshold: 3
-      initialDelaySeconds: 60
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
     resources:
-      {{- toYaml .Values.resources | nindent 12 }}
+      {{- toYaml .Values.resources | nindent 6 }}
     env:
       # Self-Signed Certs
       - name: NODE_TLS_REJECT_UNAUTHORIZED
@@ -80,11 +86,11 @@ containers:
       - name: CRIBL_DIST_MODE
         value: leader
       - name: CRIBL_DIST_MASTER_URL
-        value: "tcp://{{ .Values.config.token }}@0.0.0.0:4200"
+        value: "tcp://{{ .Values.config.token }}@{{ .Values.config.bindHost }}:4200"
       - name: CRIBL_DIST_LEADER_URL
-        value: "tcp://{{ .Values.config.token }}@0.0.0.0:4200"
+        value: "tcp://{{ .Values.config.token }}@{{ .Values.config.bindHost }}:4200"
       {{- end }}
-      # Single Volume for persistents (CRIBL-3848)
+      # Single Volume for persistence (CRIBL-3848)
       - name: CRIBL_VOLUME_DIR
         value: {{ .Values.config.criblHome }}/config-volume
       {{ if .Values.envValueFrom }}
@@ -93,8 +99,8 @@ containers:
       {{- range $key, $value := .Values.env }}
       - name: {{ $key }}
         value: {{ $value | quote }}
-      {{- end }}   
-      {{- $b_iter := 1 -}} 
+      {{- end }}
+      {{- $b_iter := 1 -}}
       {{- if .Values.config.license }}
       - name: CRIBL_BEFORE_START_CMD_{{ $b_iter }}
         value: "if [ ! -e $CRIBL_VOLUME_DIR/local/cribl/licenses.yml ]; then mkdir -p $CRIBL_VOLUME_DIR/local/cribl ; cp /var/tmp/config_bits/licenses.yml $CRIBL_VOLUME_DIR/local/cribl/licenses.yml; fi"
@@ -105,16 +111,19 @@ containers:
         value: "if [ ! -e $CRIBL_VOLUME_DIR/local/cribl/mappings.yml ]; then mkdir -p $CRIBL_VOLUME_DIR/local/cribl;  cp /var/tmp/config_bits/groups.yml $CRIBL_VOLUME_DIR/local/cribl/groups.yml; cp /var/tmp/config_bits/mappings.yml $CRIBL_VOLUME_DIR/local/cribl/mappings.yml; fi"
         {{- $b_iter = add $b_iter 1 }}
       {{- end }}
-
-     {{- $a_iter := 1 -}} 
+     {{- $a_iter := 1 -}}
      {{- if .Values.config.adminPassword }}
       - name: CRIBL_AFTER_START_CMD_{{ $a_iter }}
         value: "[ ! -f $CRIBL_VOLUME_DIR/users_imported ] && sleep 20 && cp /var/tmp/config_bits/users.json $CRIBL_VOLUME_DIR/local/cribl/auth/users.json && touch $CRIBL_VOLUME_DIR/users_imported"
-        {{- $a_iter = add $a_iter 1 }} 
+        {{- $a_iter = add $a_iter 1 }}
      {{- end }}
+{{- with .Values.extraContainers }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- if or .Values.extraInitContainers .Values.consolidate_volumes }}
 initContainers:
 {{- with .Values.extraInitContainers }}
-  {{- toYaml . | nindent 8 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 {{- if  (and .Release.IsUpgrade .Values.consolidate_volumes)  }}
   - name: pre-upgrade-volume-coalescence
@@ -122,13 +131,13 @@ initContainers:
     command: ["/bin/ash","-c"]
     args:
       - for dir in local data state groups; do
-          if [ ! -d {{ .Values.config.criblHome }}/config-volume/$dir ]; then 
-            (cd {{ .Values.config.criblHome }}; tar cf - --exclude lost+found .) | (cd {{ .Values.config.criblHome }}/config-volume; tar xf -); 
+          if [ ! -d {{ .Values.config.criblHome }}/config-volume/$dir ]; then
+            (cd {{ .Values.config.criblHome }}; tar cf - --exclude lost+found .) | (cd {{ .Values.config.criblHome }}/config-volume; tar xf -);
           fi
         done
     volumeMounts:
       - name: config-storage
-        mountPath: {{ .Values.config.criblHome }}/config-volume        
+        mountPath: {{ .Values.config.criblHome }}/config-volume
       - name: local-storage
         mountPath: {{ .Values.config.criblHome }}/local
       - name: data-storage
@@ -138,10 +147,6 @@ initContainers:
       - name: groups-storage
         mountPath: {{ .Values.config.criblHome }}/group
 {{- end }}
-
-{{- with .Values.nodeSelector }}
-nodeSelector:
-  {{- toYaml .  | nindent 2 }}
 {{- end }}
 volumes:
   {{- if  or .Values.config.license ( or .Values.config.adminPassword .Values.config.groups ) }}
@@ -162,8 +167,12 @@ volumes:
     {{- end }}
     {{- end }}
   - name: config-storage
+    {{- if .Values.persistence.enabled }}
     persistentVolumeClaim:
-      claimName: leader-config-claim
+      claimName: {{ coalesce .Values.persistence.claimName (include "logstream-leader.fullname" .) }}
+    {{- else }}
+    emptyDir: {}
+    {{- end }}
   {{- if (and .Release.IsUpgrade .Values.consolidate_volumes) }}
   - name: local-storage
     persistentVolumeClaim:
@@ -177,6 +186,14 @@ volumes:
   - name: groups-storage
     persistentVolumeClaim:
       claimName: groups-claim
+{{- end }}
+{{- if or .Values.securityContext .Values.podSecurityContext }}
+  - name: gitconfig
+    configMap:
+      name: {{ include "logstream-leader.fullname" . }}-gitconfig
+      items:
+        - key: .gitconfig
+          path: .gitconfig
 {{- end }}
 {{- range .Values.extraConfigmapMounts }}
   - name: {{ .name }}
@@ -197,17 +214,16 @@ volumes:
     csi: {{- toYaml .csi | nindent 6 }}
 {{- end }}
 {{- end }}
-
 {{- with .Values.nodeSelector }}
 nodeSelector:
-  {{- toYaml . | nindent 8 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 {{- with .Values.affinity }}
 affinity:
-  {{- toYaml . | nindent 8 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 {{- with .Values.tolerations }}
 tolerations:
-  {{- toYaml . | nindent 8 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 {{- end }}
